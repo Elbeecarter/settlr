@@ -194,6 +194,7 @@
       .hero h1 { font-size: 1.8rem; }
     }
   </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
 </head>
 <body>
 
@@ -323,7 +324,8 @@
 <script>
   const CONTRACT_ADDRESS = "0xf1BF86F41ACb3EFab4E7138A17329cdbF332174D";
   const RPC_URL = "https://gcp-1.seismictest.net/rpc";
-  const CHAIN_ID = "0x1404"; // 5124
+  const CHAIN_ID = 5124;
+  const CHAIN_ID_HEX = "0x1404";
 
   const ABI = [
     "function addEmployee(address employee, uint256 salary, string memory name) public",
@@ -334,6 +336,7 @@
     "function getMySalary() public view returns (uint256)",
     "function getMyInfo() public view returns (string memory name, uint256 lastPaid, uint256 totalReceived, bool active)",
     "function getEmployeeList() public view returns (address[] memory)",
+    "function getEmployeeName(address employee) public view returns (string memory)",
     "function payAll() public payable",
     "function depositFunds() public payable",
     "function getContractBalance() public view returns (uint256)",
@@ -342,13 +345,17 @@
     "function employer() public view returns (address)"
   ];
 
-  let userAccount = null;
+  let provider, signer, contract, userAccount;
 
-  function switchTab(tab) {
+  function switchTab(tab, e) {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-    event.target.classList.add('active');
+    e.target.classList.add('active');
     document.getElementById(tab + '-panel').classList.add('active');
+    if (userAccount) {
+      if (tab === 'employee') loadEmployeeInfo();
+      else loadDashboardStats();
+    }
   }
 
   function showAlert(msg, type) {
@@ -356,128 +363,236 @@
     box.className = 'alert alert-' + type;
     box.innerText = msg;
     box.style.display = 'block';
-    setTimeout(() => box.style.display = 'none', 5000);
+    clearTimeout(box._timer);
+    box._timer = setTimeout(() => box.style.display = 'none', 6000);
   }
 
   async function connectWallet() {
     if (typeof window.ethereum === 'undefined') {
-      showAlert('MetaMask not found! Please install MetaMask to use this app.', 'error');
+      showAlert('MetaMask not detected. Please install MetaMask.', 'error');
       return;
     }
     try {
+      // Request accounts
       await window.ethereum.request({ method: 'eth_requestAccounts' });
-      const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-      userAccount = accounts[0];
 
+      // Switch to Seismic testnet
       try {
         await window.ethereum.request({
           method: 'wallet_switchEthereumChain',
-          params: [{ chainId: CHAIN_ID }],
+          params: [{ chainId: CHAIN_ID_HEX }]
         });
       } catch (e) {
-        await window.ethereum.request({
-          method: 'wallet_addEthereumChain',
-          params: [{
-            chainId: CHAIN_ID,
-            chainName: 'Seismic Testnet',
-            rpcUrls: [RPC_URL],
-            nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 }
-          }]
-        });
+        if (e.code === 4902) {
+          await window.ethereum.request({
+            method: 'wallet_addEthereumChain',
+            params: [{
+              chainId: CHAIN_ID_HEX,
+              chainName: 'Seismic Testnet',
+              rpcUrls: [RPC_URL],
+              nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 }
+            }]
+          });
+        }
       }
 
-      document.getElementById('connectBtn').innerText = userAccount.slice(0,6) + '...' + userAccount.slice(-4);
-      document.getElementById('walletInfo').style.display = 'block';
-      document.getElementById('walletInfo').innerText = 'Connected';
-      showAlert('Wallet connected successfully!', 'success');
-      loadDashboard();
+      // Setup ethers
+      provider = new ethers.BrowserProvider(window.ethereum);
+      signer = await provider.getSigner();
+      userAccount = await signer.getAddress();
+      contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+
+      // Update UI
+      const btn = document.getElementById('connectBtn');
+      btn.innerText = userAccount.slice(0,6) + '...' + userAccount.slice(-4);
+      btn.classList.add('connected');
+
+      showAlert('Wallet connected: ' + userAccount, 'success');
+      await loadDashboardStats();
+
     } catch (e) {
-      showAlert('Failed to connect: ' + e.message, 'error');
+      showAlert('Connection failed: ' + e.message, 'error');
     }
   }
 
-  async function sendTx(method, params, value) {
-    if (!userAccount) { showAlert('Please connect your wallet first!', 'error'); return; }
+  async function loadDashboardStats() {
+    if (!contract) return;
     try {
-      const data = encodeFunction(method, params);
-      const tx = {
-        from: userAccount,
-        to: CONTRACT_ADDRESS,
-        data: data,
-      };
-      if (value) tx.value = '0x' + BigInt(Math.floor(value * 1e18)).toString(16);
-      const txHash = await window.ethereum.request({ method: 'eth_sendTransaction', params: [tx] });
-      showAlert('Transaction sent! Hash: ' + txHash.slice(0,20) + '...', 'success');
-      setTimeout(loadDashboard, 3000);
-      return txHash;
+      showAlert('Loading live contract data...', 'info');
+
+      // Load stats
+      const total = await contract.totalEmployees();
+      const paused = await contract.paused();
+      const balance = await provider.getBalance(CONTRACT_ADDRESS);
+
+      document.getElementById('totalEmp').innerText = total.toString();
+      document.getElementById('contractBal').innerText = ethers.formatEther(balance) + ' ETH';
+      document.getElementById('payrollStatus').innerText = paused ? 'Paused' : 'Active';
+
+      // Load employee list
+      try {
+        const empList = await contract.getEmployeeList();
+        const listEl = document.getElementById('employeeList');
+
+        if (empList.length === 0) {
+          listEl.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;font-weight:300;">No employees added yet.</p>';
+          return;
+        }
+
+        listEl.innerHTML = '';
+        for (let addr of empList) {
+          let name = 'Unknown';
+          try { name = await contract.getEmployeeName(addr); } catch {}
+          const initials = name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+          const shortAddr = addr.slice(0,6) + '...' + addr.slice(-4);
+          listEl.innerHTML += `
+            <div class="emp-item">
+              <div class="emp-left">
+                <div class="emp-avatar">${initials}</div>
+                <div>
+                  <div class="emp-name">${name}</div>
+                  <div class="emp-addr">${shortAddr}</div>
+                </div>
+              </div>
+              <div class="emp-badge">Active</div>
+            </div>`;
+        }
+      } catch (e) {
+        document.getElementById('employeeList').innerHTML =
+          '<p style="color:var(--text-muted);font-size:0.85rem;">Only employer can view team list.</p>';
+      }
+
+      showAlert('Dashboard loaded with live data!', 'success');
     } catch (e) {
-      showAlert('Transaction failed: ' + e.message, 'error');
+      showAlert('Error loading data: ' + e.message, 'error');
     }
   }
 
-  function encodeFunction(signature, params) {
-    const crypto = window.crypto || window.msCrypto;
-    const encoder = new TextEncoder();
-    const sig = encoder.encode(signature);
-    return '0x' + Array.from(sig).map(b => b.toString(16).padStart(2, '0')).join('');
-  }
-
-  async function loadDashboard() {
-    if (!userAccount) return;
+  async function loadEmployeeInfo() {
+    if (!contract) return;
     try {
-      document.getElementById('totalEmp').innerText = '—';
-      document.getElementById('contractBal').innerText = '—';
-      document.getElementById('payrollStatus').innerText = '—';
-      showAlert('Dashboard loaded. Use MetaMask to interact with the contract.', 'info');
-    } catch(e) {
-      console.error(e);
+      const salary = await contract.getMySalary();
+      document.getElementById('mySalary').innerText = ethers.formatEther(salary);
+
+      const info = await contract.getMyInfo();
+      document.getElementById('infoName').innerText = info[0] || '—';
+      document.getElementById('infoStatus').innerText = info[3] ? 'Active' : 'Inactive';
+      const lastPaid = Number(info[1]);
+      document.getElementById('infoLastPaid').innerText = lastPaid === 0 ? 'Not yet paid' :
+        new Date(lastPaid * 1000).toLocaleDateString();
+      document.getElementById('infoTotal').innerText = ethers.formatEther(info[2]) + ' ETH';
+
+      showAlert('Your info loaded successfully!', 'success');
+    } catch (e) {
+      showAlert('Not registered as an employee or ' + e.message, 'error');
     }
   }
 
   async function addEmployee() {
-    const address = document.getElementById('empAddress').value;
-    const name = document.getElementById('empName').value;
+    if (!contract) { showAlert('Connect wallet first.', 'error'); return; }
+    const addr = document.getElementById('empAddress').value.trim();
+    const name = document.getElementById('empName').value.trim();
     const salary = document.getElementById('empSalary').value;
-    if (!address || !name || !salary) { showAlert('Please fill all fields', 'error'); return; }
-    showAlert('Sending transaction to add ' + name + '...', 'info');
-    await sendTx('addEmployee(address,uint256,string)', [address, salary, name]);
+    if (!addr || !name || !salary) { showAlert('Please fill all fields.', 'error'); return; }
+    try {
+      showAlert('Adding ' + name + ' to payroll...', 'info');
+      const salaryWei = ethers.parseEther(salary);
+      const tx = await contract.addEmployee(addr, salaryWei, name);
+      showAlert('Transaction sent! Waiting for confirmation...', 'info');
+      await tx.wait();
+      showAlert(name + ' added successfully!', 'success');
+      document.getElementById('empAddress').value = '';
+      document.getElementById('empName').value = '';
+      document.getElementById('empSalary').value = '';
+      await loadDashboardStats();
+    } catch (e) {
+      showAlert('Failed: ' + e.message, 'error');
+    }
   }
 
   async function updateSalary() {
-    const address = document.getElementById('updateAddress').value;
-    const salary = document.getElementById('newSalary').value;
-    if (!address || !salary) { showAlert('Please fill all fields', 'error'); return; }
-    showAlert('Updating salary...', 'info');
-    await sendTx('updateSalary(address,uint256)', [address, salary]);
+    if (!contract) { showAlert('Connect wallet first.', 'error'); return; }
+    const addr = document.getElementById('updateAddress').value.trim();
+    const sal = document.getElementById('newSalary').value;
+    if (!addr || !sal) { showAlert('Please fill all fields.', 'error'); return; }
+    try {
+      showAlert('Updating salary...', 'info');
+      const tx = await contract.updateSalary(addr, ethers.parseEther(sal));
+      await tx.wait();
+      showAlert('Salary updated successfully!', 'success');
+      await loadDashboardStats();
+    } catch (e) {
+      showAlert('Failed: ' + e.message, 'error');
+    }
   }
 
   async function removeEmployee() {
-    const address = document.getElementById('removeAddress').value;
-    if (!address) { showAlert('Please enter employee address', 'error'); return; }
-    showAlert('Removing employee...', 'info');
-    await sendTx('removeEmployee(address)', [address]);
+    if (!contract) { showAlert('Connect wallet first.', 'error'); return; }
+    const addr = document.getElementById('removeAddress').value.trim();
+    if (!addr) { showAlert('Please enter an address.', 'error'); return; }
+    try {
+      showAlert('Removing employee...', 'info');
+      const tx = await contract.removeEmployee(addr);
+      await tx.wait();
+      showAlert('Employee removed successfully!', 'success');
+      await loadDashboardStats();
+    } catch (e) {
+      showAlert('Failed: ' + e.message, 'error');
+    }
   }
 
   async function pausePayroll() {
-    showAlert('Pausing payroll...', 'info');
-    await sendTx('pausePayroll()', []);
+    if (!contract) { showAlert('Connect wallet first.', 'error'); return; }
+    try {
+      showAlert('Pausing payroll...', 'info');
+      const tx = await contract.pausePayroll();
+      await tx.wait();
+      showAlert('Payroll paused!', 'success');
+      await loadDashboardStats();
+    } catch (e) {
+      showAlert('Failed: ' + e.message, 'error');
+    }
   }
 
   async function unpausePayroll() {
-    showAlert('Unpausing payroll...', 'info');
-    await sendTx('unpausePayroll()', []);
+    if (!contract) { showAlert('Connect wallet first.', 'error'); return; }
+    try {
+      showAlert('Resuming payroll...', 'info');
+      const tx = await contract.unpausePayroll();
+      await tx.wait();
+      showAlert('Payroll resumed!', 'success');
+      await loadDashboardStats();
+    } catch (e) {
+      showAlert('Failed: ' + e.message, 'error');
+    }
   }
 
   async function payAll() {
-    showAlert('Executing payroll for all employees...', 'info');
-    await sendTx('payAll()', []);
+    if (!contract) { showAlert('Connect wallet first.', 'error'); return; }
+    try {
+      showAlert('Running payroll for all employees...', 'info');
+      const tx = await contract.payAll();
+      await tx.wait();
+      showAlert('Payroll executed successfully!', 'success');
+      await loadDashboardStats();
+    } catch (e) {
+      showAlert('Failed: ' + e.message, 'error');
+    }
   }
 
   async function depositFunds() {
-    const amount = parseFloat(document.getElementById('depositAmount').value);
-    if (!amount) { showAlert('Please enter deposit amount', 'error'); return; }
-    showAlert('Depositing ' + amount + ' ETH...', 'info');
-    await sendTx('depositFunds()', [], amount);
+    if (!contract) { showAlert('Connect wallet first.', 'error'); return; }
+    const amt = document.getElementById('depositAmount').value;
+    if (!amt || parseFloat(amt) <= 0) { showAlert('Enter a valid amount.', 'error'); return; }
+    try {
+      showAlert('Depositing ' + amt + ' ETH...', 'info');
+      const tx = await contract.depositFunds({ value: ethers.parseEther(amt) });
+      await tx.wait();
+      showAlert('Funds deposited successfully!', 'success');
+      await loadDashboardStats();
+    } catch (e) {
+      showAlert('Failed: ' + e.message, 'error');
+    }
   }
 </script>
 
