@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Private Payroll — Seismic</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0a0a0f;
+      color: #e2e8f0;
+      min-height: 100vh;
+    }
+    header {
+      background: linear-gradient(135deg, #1a1a2e, #16213e);
+      padding: 20px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #2d3748;
+    }
+    .logo { font-size: 1.5rem; font-weight: 700; color: #6366f1; }
+    .logo span { color: #a78bfa; }
+    .connect-btn {
+      background: #6366f1;
+      color: white;
+      border: none;
+      padding: 10px 24px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+    .connect-btn:hover { background: #4f46e5; transform: translateY(-1px); }
+    .wallet-info {
+      font-size: 0.8rem;
+      color: #a0aec0;
+      display: none;
+    }
+    .container { max-width: 1100px; margin: 0 auto; padding: 40px 20px; }
+    .hero {
+      text-align: center;
+      margin-bottom: 50px;
+    }
+    .hero h1 { font-size: 2.5rem; font-weight: 800; color: #fff; margin-bottom: 10px; }
+    .hero p { color: #718096; font-size: 1.1rem; }
+    .badge {
+      display: inline-block;
+      background: #1a1a3e;
+      border: 1px solid #6366f1;
+      color: #a78bfa;
+      padding: 4px 14px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      margin-bottom: 16px;
+    }
+    .tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 30px;
+      background: #1a1a2e;
+      padding: 6px;
+      border-radius: 12px;
+      width: fit-content;
+    }
+    .tab {
+      padding: 10px 24px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      border: none;
+      background: transparent;
+      color: #718096;
+      transition: all 0.2s;
+    }
+    .tab.active { background: #6366f1; color: white; }
+    .tab:hover:not(.active) { color: #e2e8f0; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .card {
+      background: #1a1a2e;
+      border: 1px solid #2d3748;
+      border-radius: 16px;
+      padding: 24px;
+    }
+    .card h3 {
+      font-size: 1rem;
+      color: #a78bfa;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .stat-card {
+      background: linear-gradient(135deg, #1a1a2e, #16213e);
+      border: 1px solid #2d3748;
+      border-radius: 16px;
+      padding: 20px;
+      text-align: center;
+    }
+    .stat-value { font-size: 2rem; font-weight: 800; color: #6366f1; }
+    .stat-label { font-size: 0.8rem; color: #718096; margin-top: 4px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+    input, select {
+      width: 100%;
+      padding: 10px 14px;
+      background: #0a0a1f;
+      border: 1px solid #2d3748;
+      border-radius: 8px;
+      color: #e2e8f0;
+      font-size: 0.9rem;
+      margin-bottom: 12px;
+      outline: none;
+      transition: border 0.2s;
+    }
+    input:focus, select:focus { border-color: #6366f1; }
+    label { font-size: 0.8rem; color: #718096; margin-bottom: 4px; display: block; }
+    .btn {
+      width: 100%;
+      padding: 12px;
+      border-radius: 8px;
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+    }
+    .btn-primary { background: #6366f1; color: white; }
+    .btn-primary:hover { background: #4f46e5; }
+    .btn-danger { background: #e53e3e; color: white; }
+    .btn-danger:hover { background: #c53030; }
+    .btn-success { background: #38a169; color: white; }
+    .btn-success:hover { background: #2f855a; }
+    .btn-warning { background: #d69e2e; color: white; }
+    .btn-warning:hover { background: #b7791f; }
+    .employee-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px;
+      background: #0a0a1f;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      border: 1px solid #2d3748;
+    }
+    .employee-name { font-weight: 600; color: #e2e8f0; }
+    .employee-address { font-size: 0.75rem; color: #718096; }
+    .status-badge {
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .status-active { background: #1a3a2a; color: #68d391; }
+    .status-paused { background: #3a1a1a; color: #fc8181; }
+    .alert {
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      font-size: 0.9rem;
+      display: none;
+    }
+    .alert-success { background: #1a3a2a; border: 1px solid #38a169; color: #68d391; }
+    .alert-error { background: #3a1a1a; border: 1px solid #e53e3e; color: #fc8181; }
+    .alert-info { background: #1a1a3a; border: 1px solid #6366f1; color: #a78bfa; }
+    .salary-display {
+      text-align: center;
+      padding: 30px;
+      background: linear-gradient(135deg, #1a1a3e, #16213e);
+      border-radius: 16px;
+      border: 1px solid #6366f1;
+      margin-bottom: 20px;
+    }
+    .salary-amount { font-size: 3rem; font-weight: 800; color: #6366f1; }
+    .salary-label { color: #718096; margin-top: 8px; }
+    .shield-icon { color: #a78bfa; }
+    .contract-info {
+      background: #0a0a1f;
+      border: 1px solid #2d3748;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 0.75rem;
+      color: #718096;
+      margin-bottom: 20px;
+      word-break: break-all;
+    }
+    .loading { opacity: 0.6; pointer-events: none; }
+    @media (max-width: 768px) {
+      .grid { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .hero h1 { font-size: 1.8rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Private<span>Payroll</span> 🔐</div>
+  <div style="display:flex;align-items:center;gap:16px;">
+    <div class="wallet-info" id="walletInfo"></div>
+    <button class="connect-btn" id="connectBtn" onclick="connectWallet()">Connect Wallet</button>
+  </div>
+</header>
+
+<div class="container">
+  <div class="hero">
+    <div class="badge">⚡ Powered by Seismic Blockchain</div>
+    <h1>Private Payroll Dashboard</h1>
+    <p>Pay your employees privately on-chain. Salaries stay shielded from the public.</p>
+  </div>
+
+  <div class="contract-info">
+    📄 Contract: <strong>0xf1BF86F41ACb3EFab4E7138A17329cdbF332174D</strong> &nbsp;|&nbsp;
+    🌐 Network: Seismic Testnet &nbsp;|&nbsp;
+    🔗 Chain ID: 5124
+  </div>
+
+  <div id="alertBox" class="alert"></div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('employer')">👔 Employer</button>
+    <button class="tab" onclick="switchTab('employee')">👷 Employee</button>
+  </div>
+
+  <!-- EMPLOYER PANEL -->
+  <div id="employer-panel" class="panel active">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value" id="totalEmp">—</div>
+        <div class="stat-label">Total Employees</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="contractBal">—</div>
+        <div class="stat-label">Contract Balance (ETH)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="payrollStatus">—</div>
+        <div class="stat-label">Payroll Status</div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h3>➕ Add Employee</h3>
+        <label>Wallet Address</label>
+        <input id="empAddress" placeholder="0x..." />
+        <label>Full Name</label>
+        <input id="empName" placeholder="e.g. Alice Johnson" />
+        <label>Monthly Salary (in ETH)</label>
+        <input id="empSalary" type="number" placeholder="e.g. 0.1" step="0.001" />
+        <button class="btn btn-primary" onclick="addEmployee()">Add Employee</button>
+      </div>
+
+      <div class="card">
+        <h3>⚙️ Payroll Controls</h3>
+        <label>Update Salary — Wallet Address</label>
+        <input id="updateAddress" placeholder="0x..." />
+        <label>New Salary (in ETH)</label>
+        <input id="newSalary" type="number" placeholder="e.g. 0.2" step="0.001" />
+        <button class="btn btn-primary" onclick="updateSalary()" style="margin-bottom:10px;">Update Salary</button>
+
+        <label>Remove Employee — Wallet Address</label>
+        <input id="removeAddress" placeholder="0x..." />
+        <button class="btn btn-danger" onclick="removeEmployee()" style="margin-bottom:10px;">Remove Employee</button>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;">
+          <button class="btn btn-warning" onclick="pausePayroll()">⏸ Pause</button>
+          <button class="btn btn-success" onclick="unpausePayroll()">▶ Unpause</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>💸 Fund & Pay</h3>
+        <label>Deposit ETH to Contract</label>
+        <input id="depositAmount" type="number" placeholder="e.g. 1.0" step="0.01" />
+        <button class="btn btn-success" onclick="depositFunds()" style="margin-bottom:12px;">Deposit Funds</button>
+        <button class="btn btn-primary" onclick="payAll()">🚀 Pay All Employees Now</button>
+      </div>
+
+      <div class="card">
+        <h3>👥 Employee List</h3>
+        <div id="employeeList">
+          <p style="color:#718096;font-size:0.9rem;">Connect wallet to view employees</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EMPLOYEE PANEL -->
+  <div id="employee-panel" class="panel">
+    <div class="salary-display">
+      <div style="font-size:2rem;">🔐</div>
+      <div class="salary-amount" id="mySalary">—</div>
+      <div class="salary-label">Your Monthly Salary (ETH) — Only visible to you</div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h3>👤 My Info</h3>
+        <div id="myInfo">
+          <p style="color:#718096;font-size:0.9rem;">Connect wallet to view your info</p>
+        </div>
+      </div>
+      <div class="card">
+        <h3>🔒 Privacy Notice</h3>
+        <p style="color:#718096;font-size:0.9rem;line-height:1.6;">
+          Your salary is protected by Seismic's shielded types (<code style="color:#a78bfa;">suint256</code>).
+          No one on the blockchain — not even other employees — can see your salary amount.
+          Only you and your employer have access to this information.
+        </p>
+        <br/>
+        <p style="color:#718096;font-size:0.9rem;line-height:1.6;">
+          🛡️ This is powered by Seismic's native on-chain privacy — no zero-knowledge proofs needed.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const CONTRACT_ADDRESS = "0xf1BF86F41ACb3EFab4E7138A17329cdbF332174D";
+  const RPC_URL = "https://gcp-1.seismictest.net/rpc";
+  const CHAIN_ID = "0x1404"; // 5124
+
+  const ABI = [
+    "function addEmployee(address employee, uint256 salary, string memory name) public",
+    "function updateSalary(address employee, uint256 newSalary) public",
+    "function removeEmployee(address employee) public",
+    "function pausePayroll() public",
+    "function unpausePayroll() public",
+    "function getMySalary() public view returns (uint256)",
+    "function getMyInfo() public view returns (string memory name, uint256 lastPaid, uint256 totalReceived, bool active)",
+    "function getEmployeeList() public view returns (address[] memory)",
+    "function payAll() public payable",
+    "function depositFunds() public payable",
+    "function getContractBalance() public view returns (uint256)",
+    "function totalEmployees() public view returns (uint256)",
+    "function paused() public view returns (bool)",
+    "function employer() public view returns (address)"
+  ];
+
+  let userAccount = null;
+
+  function switchTab(tab) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    event.target.classList.add('active');
+    document.getElementById(tab + '-panel').classList.add('active');
+  }
+
+  function showAlert(msg, type) {
+    const box = document.getElementById('alertBox');
+    box.className = 'alert alert-' + type;
+    box.innerText = msg;
+    box.style.display = 'block';
+    setTimeout(() => box.style.display = 'none', 5000);
+  }
+
+  async function connectWallet() {
+    if (typeof window.ethereum === 'undefined') {
+      showAlert('MetaMask not found! Please install MetaMask to use this app.', 'error');
+      return;
+    }
+    try {
+      await window.ethereum.request({ method: 'eth_requestAccounts' });
+      const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+      userAccount = accounts[0];
+
+      try {
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: CHAIN_ID }],
+        });
+      } catch (e) {
+        await window.ethereum.request({
+          method: 'wallet_addEthereumChain',
+          params: [{
+            chainId: CHAIN_ID,
+            chainName: 'Seismic Testnet',
+            rpcUrls: [RPC_URL],
+            nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 }
+          }]
+        });
+      }
+
+      document.getElementById('connectBtn').innerText = userAccount.slice(0,6) + '...' + userAccount.slice(-4);
+      document.getElementById('walletInfo').style.display = 'block';
+      document.getElementById('walletInfo').innerText = 'Connected';
+      showAlert('Wallet connected successfully!', 'success');
+      loadDashboard();
+    } catch (e) {
+      showAlert('Failed to connect: ' + e.message, 'error');
+    }
+  }
+
+  async function sendTx(method, params, value) {
+    if (!userAccount) { showAlert('Please connect your wallet first!', 'error'); return; }
+    try {
+      const data = encodeFunction(method, params);
+      const tx = {
+        from: userAccount,
+        to: CONTRACT_ADDRESS,
+        data: data,
+      };
+      if (value) tx.value = '0x' + BigInt(Math.floor(value * 1e18)).toString(16);
+      const txHash = await window.ethereum.request({ method: 'eth_sendTransaction', params: [tx] });
+      showAlert('Transaction sent! Hash: ' + txHash.slice(0,20) + '...', 'success');
+      setTimeout(loadDashboard, 3000);
+      return txHash;
+    } catch (e) {
+      showAlert('Transaction failed: ' + e.message, 'error');
+    }
+  }
+
+  function encodeFunction(signature, params) {
+    const crypto = window.crypto || window.msCrypto;
+    const encoder = new TextEncoder();
+    const sig = encoder.encode(signature);
+    return '0x' + Array.from(sig).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  async function loadDashboard() {
+    if (!userAccount) return;
+    try {
+      document.getElementById('totalEmp').innerText = '—';
+      document.getElementById('contractBal').innerText = '—';
+      document.getElementById('payrollStatus').innerText = '—';
+      showAlert('Dashboard loaded. Use MetaMask to interact with the contract.', 'info');
+    } catch(e) {
+      console.error(e);
+    }
+  }
+
+  async function addEmployee() {
+    const address = document.getElementById('empAddress').value;
+    const name = document.getElementById('empName').value;
+    const salary = document.getElementById('empSalary').value;
+    if (!address || !name || !salary) { showAlert('Please fill all fields', 'error'); return; }
+    showAlert('Sending transaction to add ' + name + '...', 'info');
+    await sendTx('addEmployee(address,uint256,string)', [address, salary, name]);
+  }
+
+  async function updateSalary() {
+    const address = document.getElementById('updateAddress').value;
+    const salary = document.getElementById('newSalary').value;
+    if (!address || !salary) { showAlert('Please fill all fields', 'error'); return; }
+    showAlert('Updating salary...', 'info');
+    await sendTx('updateSalary(address,uint256)', [address, salary]);
+  }
+
+  async function removeEmployee() {
+    const address = document.getElementById('removeAddress').value;
+    if (!address) { showAlert('Please enter employee address', 'error'); return; }
+    showAlert('Removing employee...', 'info');
+    await sendTx('removeEmployee(address)', [address]);
+  }
+
+  async function pausePayroll() {
+    showAlert('Pausing payroll...', 'info');
+    await sendTx('pausePayroll()', []);
+  }
+
+  async function unpausePayroll() {
+    showAlert('Unpausing payroll...', 'info');
+    await sendTx('unpausePayroll()', []);
+  }
+
+  async function payAll() {
+    showAlert('Executing payroll for all employees...', 'info');
+    await sendTx('payAll()', []);
+  }
+
+  async function depositFunds() {
+    const amount = parseFloat(document.getElementById('depositAmount').value);
+    if (!amount) { showAlert('Please enter deposit amount', 'error'); return; }
+    showAlert('Depositing ' + amount + ' ETH...', 'info');
+    await sendTx('depositFunds()', [], amount);
+  }
+</script>
+
+</body>
+</html>
