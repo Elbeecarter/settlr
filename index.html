@@ -593,12 +593,15 @@
   }
 
   async function depositFunds() {
-    if (!contract) { showAlert('Connect wallet first.', 'error'); return; }
+    if (!signer) { showAlert('Connect wallet first.', 'error'); return; }
     const amt = document.getElementById('depositAmount').value;
     if (!amt || parseFloat(amt) <= 0) { showAlert('Enter a valid amount.', 'error'); return; }
     try {
       showAlert('Depositing ' + amt + ' ETH...', 'info');
-      const tx = await contract.depositFunds({ value: ethers.parseEther(amt) });
+      const tx = await signer.sendTransaction({
+        to: CONTRACT_ADDRESS,
+        value: ethers.parseEther(amt)
+      });
       await tx.wait();
       showAlert('Funds deposited successfully!', 'success');
       await loadDashboardStats();
