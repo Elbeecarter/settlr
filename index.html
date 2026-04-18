@@ -420,25 +420,35 @@
     try {
       showAlert('Loading live contract data...', 'info');
 
-      // Load stats
-      const total = await contract.totalEmployees();
-      const paused = await contract.paused();
-      const balance = await provider.getBalance(CONTRACT_ADDRESS);
+      let total = '—', bal = '—', status = '—';
 
-      document.getElementById('totalEmp').innerText = total.toString();
-      document.getElementById('contractBal').innerText = ethers.formatEther(balance) + ' ETH';
-      document.getElementById('payrollStatus').innerText = paused ? 'Paused' : 'Active';
+      try {
+        const t = await contract.totalEmployees();
+        total = t.toString();
+      } catch {}
+
+      try {
+        const b = await provider.getBalance(CONTRACT_ADDRESS);
+        bal = parseFloat(ethers.formatEther(b)).toFixed(4) + ' ETH';
+      } catch {}
+
+      try {
+        const p = await contract.paused();
+        status = p ? 'Paused ⏸' : 'Active ✅';
+      } catch {}
+
+      document.getElementById('totalEmp').innerText = total;
+      document.getElementById('contractBal').innerText = bal;
+      document.getElementById('payrollStatus').innerText = status;
 
       // Load employee list
       try {
         const empList = await contract.getEmployeeList();
         const listEl = document.getElementById('employeeList');
-
         if (empList.length === 0) {
-          listEl.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;font-weight:300;">No employees added yet.</p>';
+          listEl.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;">No employees added yet.</p>';
           return;
         }
-
         listEl.innerHTML = '';
         for (let addr of empList) {
           let name = 'Unknown';
@@ -457,16 +467,18 @@
               <div class="emp-badge">Active</div>
             </div>`;
         }
-      } catch (e) {
+      } catch {
         document.getElementById('employeeList').innerHTML =
-          '<p style="color:var(--text-muted);font-size:0.85rem;">Only employer can view team list.</p>';
+          '<p style="color:var(--text-muted);font-size:0.85rem;">Only employer can view team.</p>';
       }
 
-      showAlert('Dashboard loaded with live data!', 'success');
+      showAlert('Dashboard loaded!', 'success');
     } catch (e) {
-      showAlert('Error loading data: ' + e.message, 'error');
+      showAlert('Error: ' + e.message, 'error');
     }
   }
+
+
 
   async function loadEmployeeInfo() {
     if (!contract) return;
